@@ -7,7 +7,7 @@ import { useBodyScrollLock } from '../utils/hooks'
  * Bottom sheet on mobile (< md), centred dialog from md up.
  * Traps focus loosely, closes on Escape, locks background scroll.
  */
-export function Modal({ open, onClose, title, description, children, footer, size = 'md' }) {
+export function Modal({ open, onClose, title, description, children, footer, size = 'md', hideHeader = false }) {
   const panelRef = useRef(null)
   useBodyScrollLock(open)
 

@@ -132,7 +132,9 @@ The `service_role` key is never used in the frontend. It only lives inside the E
 
 5. **Apply the attendance schedule migration.** Run `supabase/migrations/003_attendance_schedule.sql` after the schema, and after migration 002 on existing projects. It adds configurable check-in start and late times, shift end, and automatic check-out using Supabase `pg_cron`.
 
-6. **Create the first admin.** Follow `supabase/seed_first_admin.sql`:
+6. Apply holidays and weekly schedule migration. Run supabase/migrations/004_holidays_events.sql after migration 003. It creates the holidays table, per-week attendance schedules, calendar policies, and holiday-aware reports. In the admin calendar, the default weekday pattern is only a fallback; click a date and save a Sunday?Saturday schedule to customize that exact week without affecting later weeks. Re-run this updated migration if 004 was previously applied. If PostgREST still reports a table missing, refresh the schema cache and reload the app.
+
+7. **Create the first admin.** Follow `supabase/seed_first_admin.sql`:
    - Dashboard → Authentication → Users → **Add user** with your admin email and a password, tick **Auto Confirm User**, and copy the UUID.
    - Run the SQL: insert the `schools` row (note the returned `id`), then insert the `profiles` row with `app_role = 'admin'`, `designation` left `NULL`.
 
@@ -312,8 +314,8 @@ select id, '103.5.6.0/24', 'School range' from schools where name = 'Your School
 
 ## Notes and assumptions
 
-- **Sunday is the only weekly off day**, matching the schema's `extract(dow from d) <> 0`. Saturday is treated as a working day.
-- Check-in/check-out are whole minutes; there is no location capture, no overtime and no leave/holiday calendar.
+- Weekly workdays can be set per Sunday?Saturday week in the admin calendar; a saved week overrides the school default for that exact week. Holidays and off days do not count as absences, while events do not close the school.
+- Check-in/check-out are whole minutes; there is no location capture or overtime.
 - Hours worked is the raw elapsed time between check-in and check-out, rounded to two decimals.
 - The delete action removes the auth user, which cascades to `profiles` and then to `attendance`.
 - The frontend is a pure SPA: no SSR, no server component, no service worker.

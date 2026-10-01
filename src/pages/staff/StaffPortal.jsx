@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import {
   LogIn,
   LogOut,
@@ -12,10 +12,11 @@ import {
   ShieldAlert,
 } from 'lucide-react'
 import { useAuth } from '../../context/auth'
-import { useTodayAttendance } from '../../lib/queries'
+import { useTodayAttendance, useHolidays, useSchoolWorkingDays, useSchoolWorkingWeeks } from '../../lib/queries'
 import { useIpStatus } from '../../lib/ipHooks'
 import { useAttendanceActions, IP_BLOCKED_MESSAGE } from '../../lib/attendanceActions'
 import { Card } from '../../components/Layout'
+import AttendanceSuccessModal from '../../components/AttendanceSuccessModal'
 import { Button } from '../../components/Button'
 import { StatusBadge, Chip, DesignationBadge } from '../../components/Badge'
 import { SkeletonCard, ErrorState } from '../../components/Feedback'
@@ -27,20 +28,32 @@ import {
   formatTime,
   formatHours,
   hoursBetween,
-  isSunday,
   toDateKey,
   DEFAULT_TIMEZONE,
 } from '../../utils/format'
 
 export default function StaffPortal() {
-  const { profile, timezone = DEFAULT_TIMEZONE, lateAfter = '08:00' } = useAuth()
+  const { profile, school, timezone = DEFAULT_TIMEZONE, lateAfter = '08:00' } = useAuth()
   const now = useNow(1000)
 
   const todayKey = useMemo(() => toDateKey(now, timezone), [now, timezone])
-  const isSundayToday = isSunday(todayKey)
+  const schoolDays = useSchoolWorkingDays(school?.id)
+  const weekStart = useMemo(() => { const d = new Date(todayKey + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() - d.getUTCDay()); return d.toISOString().slice(0,10) }, [todayKey])
+  const weekPlan = useSchoolWorkingWeeks(school?.id, weekStart, weekStart)
+  const workingDays = weekPlan.data?.[0]?.working_days ?? schoolDays.data ?? [1, 2, 3, 4, 5, 6]
 
   const { data: today, loading, error, refresh } = useTodayAttendance(profile?.id, timezone, todayKey)
   const { checkIn, checkOut, pending } = useAttendanceActions(refresh)
+  const [success, setSuccess] = useState(null)
+  const dayEvents = useHolidays(school?.id, todayKey, todayKey)
+  const todayHoliday = dayEvents.data?.find((item) => item.kind === 'holiday' || item.kind === 'off_day')
+  const todayEvents = (dayEvents.data ?? []).filter((item) => item.kind === 'event')
+  const workOverrideDescription = dayEvents.data?.find((item) => item.kind === 'working_day')?.description
+  const todayHolidayOverride = Boolean(todayHoliday)
+  const todayWorkOverride = Boolean(workOverrideDescription)
+  const isWeeklyOffToday = !todayHolidayOverride && !todayWorkOverride && !workingDays.includes(new Date(todayKey + 'T12:00:00Z').getUTCDay())
+  const handleCheckIn = async () => { const row = await checkIn(); if (row) setSuccess({ type: 'in', row }) }
+  const handleCheckOut = async () => { const row = await checkOut(); if (row) setSuccess({ type: 'out', row }) }
   const ip = useIpStatus(timezone)
 
   const status = today?.status ?? null
@@ -100,10 +113,13 @@ export default function StaffPortal() {
         </p>
       ) : null}
 
-      {isSundayToday ? (
+      {todayHoliday ? <p className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900"><CalendarDays size={18} className="mt-0.5 shrink-0" aria-hidden="true" /><span>Holiday / School Closed: {todayHoliday.description}</span></p> : null}
+      {workOverrideDescription ? <p className="flex items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900"><CalendarDays size={18} className="mt-0.5 shrink-0" aria-hidden="true" /><span>Extra working day: {workOverrideDescription}</span></p> : null}
+      {todayEvents.length ? <p className="flex items-start gap-2 rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-semibold text-brand-900"><CalendarDays size={18} className="mt-0.5 shrink-0" aria-hidden="true" /><span>School event: {todayEvents.map((event) => event.description).join(', ')}</span></p> : null}
+      {isWeeklyOffToday && !todayHoliday ? (
         <p className="flex items-start gap-2 rounded-2xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-medium text-brand-900">
           <Sun size={18} className="mt-0.5 shrink-0 text-brand-600" aria-hidden="true" />
-          Today is Sunday, the weekly off day. Attendance is optional, but you can still check in.
+          Today is a weekly off day. Attendance is optional, but you can still check in.
         </p>
       ) : null}
 
@@ -170,7 +186,7 @@ export default function StaffPortal() {
               fullWidth
               loading={pending === 'check_in'}
               disabled={Boolean(pending) || ip.loading}
-              onClick={checkIn}
+              onClick={handleCheckIn}
               className="min-h-16"
             >
               {!pending ? <LogIn size={22} aria-hidden="true" /> : null}
@@ -188,7 +204,7 @@ export default function StaffPortal() {
               fullWidth
               loading={pending === 'check_out'}
               disabled={Boolean(pending)}
-              onClick={checkOut}
+              onClick={handleCheckOut}
               className="min-h-16"
             >
               {!pending ? <LogOut size={22} aria-hidden="true" /> : null}
@@ -214,13 +230,8 @@ export default function StaffPortal() {
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <DesignationBadge designation={profile?.designation} />
-        <Chip tone="brand">{designationLabel(profile?.designation)}</Chip>
-        {checkedIn ? (
-          <Chip tone={status === 'late' ? 'amber' : 'green'}>{status === 'late' ? 'Late' : 'Present'}</Chip>
-        ) : null}
-      </div>
+      
+      {success ? <AttendanceSuccessModal success={success} timezone={timezone} onClose={() => setSuccess(null)} /> : null}
     </main>
   )
 }

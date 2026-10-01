@@ -9,8 +9,9 @@ import {
   ArrowRight,
 } from 'lucide-react'
 import { useAuth } from '../../context/auth'
-import { useCheckedInToday, useDashboardToday } from '../../lib/queries'
+import { useCheckedInToday, useDashboardToday, useHolidays, useSchoolWorkingDays, useSchoolWorkingWeeks } from '../../lib/queries'
 import { PageHeader, Card } from '../../components/Layout'
+import SchoolCalendar from '../../components/SchoolCalendar'
 import { StatCard, StatusBadge, DesignationBadge } from '../../components/Badge'
 import { Button } from '../../components/Button'
 import { EmptyState, ErrorState, SkeletonCard, SkeletonLine } from '../../components/Feedback'
@@ -32,6 +33,15 @@ export default function AdminDashboard() {
   const now = useNow(30_000)
 
   const todayKey = useTodayKey(timezone)
+  const calendarToday = useHolidays(school?.id, todayKey, todayKey)
+  const weeklySchedule = useSchoolWorkingDays(school?.id)
+  const currentWeekStart = (() => { const d = new Date(todayKey + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() - d.getUTCDay()); return d.toISOString().slice(0,10) })()
+  const exactWeek = useSchoolWorkingWeeks(school?.id, currentWeekStart, currentWeekStart)
+  const workingDaysForToday = exactWeek.data?.[0]?.working_days ?? weeklySchedule.data ?? [1, 2, 3, 4, 5, 6]
+  const holidayToday = calendarToday.data?.find((item) => item.kind === 'holiday' || item.kind === 'off_day')
+  const workdayToday = calendarToday.data?.find((item) => item.kind === 'working_day')
+  const todayWorkOverride = Boolean(workdayToday)
+  const isWeeklyOff = !holidayToday && !todayWorkOverride && !workingDaysForToday.includes(new Date(todayKey + 'T12:00:00Z').getUTCDay())
 
   const stats = useDashboardToday(timezone)
   const checkedIn = useCheckedInToday(timezone, todayKey)
@@ -44,6 +54,7 @@ export default function AdminDashboard() {
 
   const d = stats.data
   const rate = percentage((d?.present ?? 0) + (d?.late ?? 0), d?.total ?? 0)
+  const calendarClosedToday = Boolean(holidayToday || isWeeklyOff)
   const rows = checkedIn.data ?? []
 
   return (
@@ -65,6 +76,8 @@ export default function AdminDashboard() {
         }
       />
 
+      {holidayToday || isWeeklyOff || workdayToday ? <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900"><span>{holidayToday ? (holidayToday.kind === 'off_day' ? 'School off day' : 'Holiday / School Closed') : isWeeklyOff ? 'Weekly off day' : 'Extra working day'}</span>{(holidayToday?.description || workdayToday?.description) ? <span className="font-medium">- {(holidayToday?.description || workdayToday?.description)}</span> : null}</div> : null}
+
       {stats.error ? (
         <div className="mb-4">
           <ErrorState message={stats.error} onRetry={stats.refresh} />
@@ -83,14 +96,14 @@ export default function AdminDashboard() {
         ) : (
           <>
             <StatCard label="Total staff" value={d?.total ?? 0} icon={Users} tone="slate" hint="Active staff accounts" />
-            <StatCard label="Present" value={d?.present ?? 0} icon={UserCheck} tone="green" hint="On time today" />
+            <StatCard label="On Time" value={d?.present ?? 0} icon={UserCheck} tone="green" hint="Checked in by the late cutoff" />
             <StatCard label="Late" value={d?.late ?? 0} icon={Clock3} tone="amber" hint={`After ${school?.late_after ?? '08:00'}`} />
             <StatCard label="Absent" value={d?.absent ?? 0} icon={UserX} tone="rose" hint="No check-in recorded" />
           </>
         )}
       </div>
 
-      {!stats.loading && d ? (
+      {!stats.loading && d && !calendarClosedToday ? (
         <Card className="mt-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -113,6 +126,8 @@ export default function AdminDashboard() {
           </div>
         </Card>
       ) : null}
+
+      <SchoolCalendar school={school} timezone={timezone} />
 
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
         <Card

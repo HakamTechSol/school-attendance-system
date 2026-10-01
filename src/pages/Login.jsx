@@ -48,10 +48,23 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-slate-100">
-      <div className="flex flex-1 items-center justify-center px-4 py-8 sm:py-12">
-        <div className="w-full max-w-md">
-          <div className="mb-6 flex flex-col items-center text-center sm:mb-8">
+    <div className="flex h-dvh items-center justify-center overflow-hidden bg-slate-100 p-2 sm:p-4">
+      <main className="grid h-full w-full max-w-6xl min-h-0 overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200 md:grid-cols-2">
+        <section className="relative hidden min-h-0 overflow-hidden bg-slate-900 md:block" aria-label="School attendance">
+          <img src="/3870277.jpg" alt="School attendance" className="absolute inset-0 h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-900/20 to-slate-900/10" />
+          <div className="absolute inset-x-0 bottom-0 p-6 text-white sm:p-9 md:p-10">
+            <span className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 text-brand-300 ring-1 ring-white/20 backdrop-blur-sm">
+              <GraduationCap size={26} aria-hidden="true" />
+            </span>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand-200">Attendance made simple</p>
+            <h2 className="mt-2 max-w-md text-2xl font-bold tracking-tight sm:text-3xl">Welcome to your school workspace</h2>
+            <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-200">A simple place to manage daily attendance and stay connected with your school.</p>
+          </div>
+        </section>
+        <section className="flex min-h-0 items-center justify-center overflow-y-auto px-4 py-4 sm:px-8 sm:py-6 md:px-10">
+          <div className="w-full max-w-md">
+          <div className="mb-4 flex flex-col items-center text-center sm:mb-5">
             <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-900 text-brand-300 shadow-lg">
               <GraduationCap size={28} aria-hidden="true" />
             </span>
@@ -64,7 +77,7 @@ export default function Login() {
           {!isSupabaseConfigured ? (
             <div
               role="alert"
-              className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900"
+              className="mb-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-900"
             >
               Supabase is not configured. Copy <code className="font-mono">.env.example</code> to{' '}
               <code className="font-mono">.env</code> and add your project URL and anon key.
@@ -73,7 +86,7 @@ export default function Login() {
 
           <form
             onSubmit={handleSubmit}
-            className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-lg sm:p-6"
+            className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-lg sm:space-y-4 sm:p-5"
             noValidate
           >
             <TextInput
@@ -135,18 +148,10 @@ export default function Login() {
             ) : null}
           </form>
 
-          <ul className="mt-6 space-y-2 text-xs text-slate-500 sm:text-sm">
-            <li className="flex items-start gap-2">
-              <Clock3 size={16} className="mt-0.5 shrink-0 text-brand-500" aria-hidden="true" />
-              One check-in per day. Late is marked automatically by the server.
-            </li>
-            <li className="flex items-start gap-2">
-              <ShieldCheck size={16} className="mt-0.5 shrink-0 text-brand-500" aria-hidden="true" />
-              Staff can only see their own records. Admins see their whole school.
-            </li>
-          </ul>
-        </div>
-      </div>
+        
+          </div>
+        </section>
+      </main>
     </div>
   )
 }

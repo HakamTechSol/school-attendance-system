@@ -11,7 +11,7 @@ import {
   Legend,
 } from 'recharts'
 import { useAuth } from '../../context/auth'
-import { useAttendanceReport } from '../../lib/queries'
+import { useAttendanceReport, useHolidays, useSchoolWorkingDays, useSchoolWorkingWeeks } from '../../lib/queries'
 import { PageHeader, Card, SegmentedControl, FilterToggle } from '../../components/Layout'
 import { Button } from '../../components/Button'
 import { SelectInput } from '../../components/Input'
@@ -20,10 +20,10 @@ import { DesignationBadge } from '../../components/Badge'
 import { EmptyState, ErrorState, SkeletonTable } from '../../components/Feedback'
 import { usePageTitle, useTodayKey } from '../../utils/hooks'
 import {
+  addDays as shiftDate,
   DEFAULT_TIMEZONE,
   DESIGNATIONS,
   addDays,
-  countWorkingDays,
   designationLabel,
   downloadCsv,
   endOfMonth,
@@ -34,6 +34,12 @@ import {
   startOfYear,
 } from '../../utils/format'
 
+function weekStart(dateKey) {
+  const date = new Date(dateKey + 'T12:00:00Z')
+  date.setUTCDate(date.getUTCDate() - date.getUTCDay())
+  return date.toISOString().slice(0, 10)
+}
+
 const TABS = [
   { value: 'day', label: 'Day' },
   { value: 'week', label: 'Week' },
@@ -43,7 +49,7 @@ const TABS = [
 
 export default function Reports() {
   usePageTitle('Reports')
-  const { timezone = DEFAULT_TIMEZONE } = useAuth()
+  const { school, timezone = DEFAULT_TIMEZONE } = useAuth()
 
   const todayKey = useTodayKey(timezone)
   const [tab, setTab] = useState('month')
@@ -68,6 +74,10 @@ export default function Reports() {
   }, [tab, anchor])
 
   const { data: rows, loading, error, refresh } = useAttendanceReport(range.from, range.to, designation)
+  const effectiveTo = range.to > todayKey ? todayKey : range.to
+  const holidays = useHolidays(school?.id, range.from, effectiveTo)
+  const weeklySchedule = useSchoolWorkingDays(school?.id)
+  const weekPlans = useSchoolWorkingWeeks(school?.id, weekStart(range.from), weekStart(effectiveTo))
 
   const reportRows = useMemo(() => rows ?? [], [rows])
 
@@ -75,7 +85,16 @@ export default function Reports() {
     const present = reportRows.reduce((a, r) => a + (r.present_days ?? 0), 0)
     const late = reportRows.reduce((a, r) => a + (r.late_days ?? 0), 0)
     const absent = reportRows.reduce((a, r) => a + (r.absent_days ?? 0), 0)
-    const workingDays = countWorkingDays(range.from, range.to > todayKey ? todayKey : range.to)
+    const workingWeek = new Set(weeklySchedule.data ?? [1, 2, 3, 4, 5, 6])
+    const calendarItems = holidays.data ?? []
+    const closedDates = new Set(calendarItems.filter((item) => item.kind === 'holiday' || item.kind === 'off_day').map((item) => item.holiday_date))
+    const extraWorkDates = new Set(calendarItems.filter((item) => item.kind === 'working_day').map((item) => item.holiday_date))
+    const customWeeks = Object.fromEntries((weekPlans.data ?? []).map((week) => [week.week_start, new Set(week.working_days)]))
+    let workingDays = 0
+    for (let day = range.from; day <= effectiveTo; day = shiftDate(day, 1)) {
+      const weekday = new Date(day + 'T12:00:00Z').getUTCDay()
+      if (!closedDates.has(day) && ((customWeeks[weekStart(day)] ?? workingWeek).has(weekday) || extraWorkDates.has(day))) workingDays += 1
+    }
     const possible = reportRows.length * workingDays
     return {
       staff: reportRows.length,
@@ -86,7 +105,7 @@ export default function Reports() {
       possible,
       rate: percentage(present + late, possible),
     }
-  }, [reportRows, range, todayKey])
+  }, [reportRows, range, todayKey, holidays.data, effectiveTo, weeklySchedule.data, weekPlans.data])
 
   const chartData = useMemo(
     () =>
@@ -155,7 +174,7 @@ export default function Reports() {
     <>
       <PageHeader
         title="Attendance reports"
-        description={`${formatDate(`${range.from}T12:00:00Z`, 'UTC')} to ${formatDate(`${range.to}T12:00:00Z`, 'UTC')} - Sundays excluded - future days ignored`}
+        description={`${formatDate(`${range.from}T12:00:00Z`, 'UTC')} to ${formatDate(`${range.to}T12:00:00Z`, 'UTC')} - school off days excluded - future days ignored`}
         actions={
           <Button variant="outline" onClick={exportCsv} disabled={reportRows.length === 0}>
             <Download size={16} aria-hidden="true" /> Export CSV
@@ -229,7 +248,7 @@ export default function Reports() {
         </Card>
       ) : null}
 
-      <Card className="mt-4" title="Detailed report" description="Working days only (Sundays are weekly off)">
+      <Card className="mt-4" title="Detailed report" description="Working days only (based on each week's saved schedule)">
         {loading ? (
           <SkeletonTable rows={5} cols={6} />
         ) : error ? (

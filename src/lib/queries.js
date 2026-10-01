@@ -186,3 +186,40 @@ export function useAttendanceLogs(filters, page) {
 }
 
 export { PAGE_SIZE }
+
+/** School holidays and events in an inclusive date range. */
+export function useHolidays(schoolId, from, to) {
+  return useAsync(async () => {
+    if (!schoolId || !from || !to) return []
+    const { data, error } = await supabase
+      .from('holidays')
+      .select('id, school_id, holiday_date, kind, description')
+      .eq('school_id', schoolId)
+      .gte('holiday_date', from)
+      .lte('holiday_date', to)
+      .order('holiday_date', { ascending: true })
+    if (error) throw error
+    return data ?? []
+  }, [schoolId, from, to])
+}
+
+
+/** School-configured weekdays (0 Sunday through 6 Saturday). */
+export function useSchoolWorkingDays(schoolId) {
+  return useAsync(async () => {
+    if (!schoolId) return [1, 2, 3, 4, 5, 6]
+    const { data, error } = await supabase.from('schools').select('working_days').eq('id', schoolId).maybeSingle()
+    if (error) throw error
+    return data?.working_days ?? [1, 2, 3, 4, 5, 6]
+  }, [schoolId])
+}
+
+/** Exact Sunday-start week schedules in an inclusive range. */
+export function useSchoolWorkingWeeks(schoolId, from, to) {
+  return useAsync(async () => {
+    if (!schoolId || !from || !to) return []
+    const { data, error } = await supabase.from('school_work_weeks').select('school_id, week_start, working_days').eq('school_id', schoolId).gte('week_start', from).lte('week_start', to).order('week_start')
+    if (error) throw error
+    return data ?? []
+  }, [schoolId, from, to])
+}
