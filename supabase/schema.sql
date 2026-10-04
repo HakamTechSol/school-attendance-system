@@ -18,7 +18,7 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 
 do $$ begin
-  create type staff_role as enum ('teacher','principal','peon','driver','security_guard','accountant');
+  create type staff_role as enum ('teacher','principal','peon','driver','security_guard','accountant','student');
 exception when duplicate_object then null; end $$;
 
 do $$ begin

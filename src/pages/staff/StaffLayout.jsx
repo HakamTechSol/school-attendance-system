@@ -32,7 +32,7 @@ export default function StaffLayout() {
           </span>
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-white">{school?.name ?? 'School'}</p>
-            <p className="truncate text-xs text-slate-400">Staff portal</p>
+            <p className="truncate text-xs text-slate-400">Attendance portal</p>
           </div>
         </div>
 

@@ -5,6 +5,7 @@ export const DESIGNATIONS = [
   { value: 'driver', label: 'Driver' },
   { value: 'security_guard', label: 'Security Guard' },
   { value: 'accountant', label: 'Accountant' },
+  { value: 'student', label: 'Student' },
 ]
 
 const DESIGNATION_LABELS = Object.fromEntries(DESIGNATIONS.map((d) => [d.value, d.label]))

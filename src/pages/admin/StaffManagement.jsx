@@ -3,6 +3,7 @@ import { Users, Plus, Pencil, Trash2, Filter, Mail, UserX } from 'lucide-react'
 import { useAuth } from '../../context/auth'
 import { useToast } from '../../context/toast'
 import { supabase } from '../../lib/supabase'
+import { invokeManageStaff } from '../../lib/manageStaff'
 import { useStaffList } from '../../lib/queries'
 import { friendlyMessage } from '../../lib/attendanceActions'
 import { PageHeader, Card, FilterToggle } from '../../components/Layout'
@@ -47,16 +48,12 @@ export default function StaffManagement() {
   const activeFilterCount = (designation ? 1 : 0) + (search.trim() ? 1 : 0)
 
   const handleCreate = async (values) => {
-    const { data, error: invokeErr } = await supabase.functions.invoke('manage-staff', {
-      body: {
-        email: values.email.trim(),
-        password: values.password,
-        full_name: values.full_name.trim(),
-        designation: values.designation,
-      },
+    await invokeManageStaff({
+      email: values.email.trim(),
+      password: values.password,
+      full_name: values.full_name.trim(),
+      designation: values.designation,
     })
-    if (invokeErr) throw new Error(invokeErr.message)
-    if (data?.error) throw new Error(data.error)
     toast.success(`${values.full_name} can now sign in.`)
     refresh()
   }
@@ -75,16 +72,16 @@ export default function StaffManagement() {
     if (!deleting) return
     setDeleteBusy(true)
     try {
-      const { data, error: invokeErr } = await supabase.functions.invoke('manage-staff', {
-        body: { action: 'delete', id: deleting.id },
-      })
-      if (invokeErr) throw new Error(invokeErr.message)
-      if (data?.error) throw new Error(data.error)
+      await invokeManageStaff({ action: 'delete', id: deleting.id })
       toast.success(`${deleting.full_name} was removed.`)
       setDeleting(null)
       refresh()
     } catch (err) {
       toast.error(friendlyMessage(err?.message))
+      if (err?.code === 'NOT_FOUND') {
+        setDeleting(null)
+        refresh()
+      }
     } finally {
       setDeleteBusy(false)
     }
@@ -118,8 +115,8 @@ export default function StaffManagement() {
       />
 
       <Card
-        title="Staff directory"
-        description="Search by name or email, filter by designation."
+        title="Staff & students"
+        description="Add staff or students, or filter by designation."
         actions={
           <Chip tone="brand">
             Showing {filtered.length} of {staffList.length}
@@ -274,7 +271,7 @@ function StaffRows({ staff, onEdit, onDelete }) {
       {/* Table on md+ */}
       <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[640px] text-left text-sm">
-          <caption className="sr-only">Staff accounts in your school</caption>
+          <caption className="sr-only">Staff and student accounts in your school</caption>
           <thead>
             <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
               <th scope="col" className="py-2.5 pr-3 font-bold">Name</th>

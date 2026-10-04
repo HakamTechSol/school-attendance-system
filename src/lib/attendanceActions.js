@@ -16,8 +16,24 @@ const FRIENDLY = [
   [/check-in window has ended/i, 'The check-in window has ended for today.'],
   [/no active check-in/i, 'There is no active check-in to close for today.'],
   [/profile not found/i, 'Your profile is missing. Please contact your administrator.'],
-  [/admins only/i, 'This action is restricted to administrators.'],
-  [/failed to fetch|network|fetch failed/i, 'Network problem. Check your connection and try again.'],
+  [/admins only|only an administrator can manage staff/i, 'This action is restricted to administrators.'],
+  // Duplicate email: from the auth service or from our own profiles lookup.
+  // "another school" must be tested FIRST, otherwise it gets swallowed by the
+  // broader "already registered" pattern below and loses its specific message.
+  [/another school|cannot be added again/i, 'That email is already registered with another school.'],
+  [
+    /already been registered|already registered|user_already_exists|already in your staff list/i,
+    'A user with this email address already exists. Use a different email, or edit the existing account.',
+  ],
+  [/cannot remove your own account/i, 'You cannot remove your own account.'],
+  [/no longer exists/i, 'That record no longer exists.'],
+  [/could not reach the server/i, 'Could not reach the server. Check your connection and try again.'],
+  // The generic non-2xx wrapper from supabase-js carries no useful text.
+  [/edge function returned a non-2xx|functions_http_error/i, GENERIC_ERROR],
+  [/failed to fetch|networkerror|fetch failed|network/i, 'Network problem. Check your connection and try again.'],
+  [/password should be|too weak/i, 'Password is too weak. Use at least 8 characters.'],
+  [/at least 6 characters/i, 'Password must be at least 8 characters.'],
+  [/email address is not valid|invalid email|invalid input syntax for type email/i, 'That email address is not valid.'],
   // Postgres type/cast problems are never useful to a teacher or a guard.
   // MUST come before the auth rule below, otherwise "22P02: invalid input
   // syntax" gets swallowed by the word "invalid" and reports an expired session.
